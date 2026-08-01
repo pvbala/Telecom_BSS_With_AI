@@ -1,0 +1,22 @@
+scenario: "Churn test - HEALTHY (low risk) customers"
+steps:
+  - action: create_customer
+    count: 5
+    template: individual_postpaid_customer
+
+  - action: place_order
+    count: 3
+    order:
+      channel: online
+      products:
+        - offering_name: "5G Postpaid 50GB"
+          attributes: { DataAllowanceGB: 50, SIMType: eSIM, APN: internet.mno }
+
+  - action: provision_service
+
+  - action: generate_usage
+    profile: heavy_user
+    duration_days: 30
+
+  - action: raise_invoice
+  # no mark_invoice_overdue, no create_ticket - these customers look healthy

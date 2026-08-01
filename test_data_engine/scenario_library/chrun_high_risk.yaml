@@ -1,0 +1,28 @@
+scenario: "Churn test - HIGH RISK customers"
+steps:
+  - action: create_customer
+    count: 5
+    template: individual_prepaid_customer
+
+  - action: place_order
+    count: 1
+    order:
+      channel: online
+      products:
+        - offering_name: "4G Postpaid 20GB"
+          attributes: { DataAllowanceGB: 20, SIMType: physical, APN: internet.mno }
+
+  - action: provision_service
+
+  - action: generate_usage
+    profile: light_user
+    duration_days: 30
+
+  - action: raise_invoice
+
+  - action: mark_invoice_overdue
+    fraction: 1.0
+
+  - action: create_ticket
+    count: 3
+    subjects: ["Billing dispute", "Poor network coverage", "Service outage complaint"]

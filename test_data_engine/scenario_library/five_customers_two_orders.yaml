@@ -1,0 +1,21 @@
+scenario: "5 Customers, 2 Orders Each, Provision, Invoice"
+steps:
+  - action: create_customer
+    count: 5
+    template: individual_prepaid_customer
+
+  - action: place_order
+    count: 2
+    order:
+      channel: online
+      products:
+        - offering_name: "5G Postpaid 50GB"
+          attributes: { DataAllowanceGB: 50, SIMType: eSIM, APN: internet.mno }
+
+  - action: provision_service
+
+  - action: generate_usage
+    profile: moderate_data_user
+    duration_days: 30
+
+  - action: raise_invoice
