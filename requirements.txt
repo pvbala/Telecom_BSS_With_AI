@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+python-dotenv
+faker
+pyyaml
+pandas
+scikit-learn
+joblib
+apscheduler
+blinker
+streamlit
+requests
+google-generativeai
+pytest
