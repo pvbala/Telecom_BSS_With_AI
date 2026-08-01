@@ -1,0 +1,21 @@
+use_case_id: churn_prediction
+objective: "Predict which customers are at high risk of churn"
+domain: Customer / BSS
+trigger: scheduled_daily
+inputs:
+  tables: [party_customers, billing_invoices, assurance_tickets, inventory_product_instances]
+features:
+  - tenure_days
+  - invoice_count
+  - overdue_invoice_count
+  - ticket_count
+  - active_product_count
+label: null            # unsupervised proxy score used until real churn labels accumulate
+model_type: gradient_boosted_classifier
+output:
+  action: "publish_event: churn_score_ready"
+  consumers: [crm]
+  score_threshold: 0.7
+refresh_cadence: daily
+retrain_cadence: weekly
+owner: "Customer Analytics"

@@ -1,0 +1,18 @@
+use_case_id: revenue_leakage
+objective: "Detect active product instances with usage but no corresponding billed invoice"
+domain: Billing / Revenue Assurance
+trigger: scheduled_daily
+inputs:
+  tables: [inventory_product_instances, mediation_rated_charges, billing_invoices]
+features:
+  - rated_charge_total
+  - invoiced_total
+  - discrepancy_amount
+model_type: rule_based_reconciliation
+output:
+  action: "publish_event: leakage_detected"
+  consumers: [revenue_assurance_queue]
+  score_threshold: 0.0
+refresh_cadence: daily
+retrain_cadence: not_applicable
+owner: "Revenue Assurance"

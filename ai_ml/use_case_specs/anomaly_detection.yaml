@@ -1,0 +1,19 @@
+use_case_id: anomaly_detection
+objective: "Detect anomalous alarm patterns and assist troubleshooting"
+domain: OSS / Network
+trigger: event_driven
+event_name: alarm_raised
+inputs:
+  tables: [assurance_alarms]
+features:
+  - severity_weight
+  - alarms_last_hour_same_type
+  - alarms_last_hour_same_service
+model_type: isolation_forest
+output:
+  action: "publish_event: anomaly_detected"
+  consumers: [assurance, noc_dashboard]
+  score_threshold: 0.6
+refresh_cadence: real_time
+retrain_cadence: monthly
+owner: "Network Analytics"
