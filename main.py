@@ -16,8 +16,10 @@ from modules.inventory.api import router as inventory_router
 from modules.billing.api import router as billing_router
 from modules.assurance.api import router as assurance_router
 from modules.crm.api import router as crm_router
+from modules.resource_inventory.api import router as resource_inventory_router
 
 from modules.catalog.service import seed_default_catalog_if_empty
+from modules.resource_inventory.service import seed_resource_pool_if_empty
 from modules.crm.service import register_event_subscribers as register_crm_subscribers
 from ai_ml.event_subscribers import register_event_subscribers as register_ai_event_subscribers
 from ai_ml.scheduler_jobs import register_scheduled_jobs
@@ -38,11 +40,13 @@ app.include_router(inventory_router)
 app.include_router(billing_router)
 app.include_router(assurance_router)
 app.include_router(crm_router)
+app.include_router(resource_inventory_router)
 
 
 @app.on_event("startup")
 def on_startup():
     init_db()                              # additive: only creates missing tables
+    seed_resource_pool_if_empty()          # additive: only seeds if resource pool is empty
     seed_default_catalog_if_empty()        # additive: only seeds if catalog is empty
     register_crm_subscribers()             # CRM listens for churn_score_ready
     register_ai_event_subscribers()        # anomaly_detection listens for alarm_raised
@@ -68,6 +72,8 @@ class RunScenarioYamlRequest(BaseModel):
 
 class TranslateNLRequest(BaseModel):
     text: str
+    gemini_key: str | None = None   # caller's own key - never falls back to another caller's key
+    grok_key: str | None = None
 
 
 @app.post("/test-data/run-from-file")
@@ -82,7 +88,7 @@ def run_from_yaml(req: RunScenarioYamlRequest):
 
 @app.post("/test-data/translate")
 def translate_nl(req: TranslateNLRequest):
-    return translate_nl_spec(req.text)
+    return translate_nl_spec(req.text, gemini_key=req.gemini_key, grok_key=req.grok_key)
 
 
 # ---- AI Insights endpoints ----
@@ -94,8 +100,10 @@ def score_use_case(use_case_id: str, entity_id: int | None = None):
 
 class NLQueryRequest(BaseModel):
     question: str
+    gemini_key: str | None = None   # caller's own key - never falls back to another caller's key
+    grok_key: str | None = None
 
 
 @app.post("/ai/nl-query")
 def nl_query(req: NLQueryRequest):
-    return nl_ask(req.question)
+    return nl_ask(req.question, gemini_key=req.gemini_key, grok_key=req.grok_key)
