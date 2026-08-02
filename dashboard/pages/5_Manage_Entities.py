@@ -266,6 +266,22 @@ with tabs[4]:
                            f"(status: {result['status']})")
 
     st.divider()
+    st.subheader("Invoice Payment")
+    st.caption("Simple payment marking — no partial payments, just marks the invoice as fully paid.")
+    unpaid_invoices = [i for i in billing_service.list_invoices() if i["status"] != "PAID"]
+    if not unpaid_invoices:
+        st.info("No unpaid invoices right now.")
+    else:
+        invoice_choice = st.selectbox(
+            "Invoice", unpaid_invoices,
+            format_func=lambda i: f"{i['code']} — account {i['account_id']} — ₹{i['amount']} ({i['status']})",
+            key="invoice_payment_choice",
+        )
+        if st.button("💳 Mark as Paid", type="primary"):
+            result = billing_service.mark_invoice_paid(invoice_choice["id"])
+            st.success(f"Invoice {result['code']} marked as PAID.")
+
+    st.divider()
     st.subheader("Existing invoices")
     st.dataframe(billing_service.list_invoices(), use_container_width=True)
 
@@ -318,35 +334,4 @@ with tabs[5]:
 
 
 # ---------------------------------------------------------------------
-# TAB 7 — Resource Inventory: available network resources for further use
-# ---------------------------------------------------------------------
-with tabs[6]:
-    st.subheader("Resource availability")
-    st.caption("Tracks the finite pool of network resources (MSISDNs, circuit IDs, IMSIs) "
-               "that provisioning draws from - this is what answers 'how many are left'.")
-
-    summary = resource_service.summary()
-    if not summary:
-        st.info("Resource pool not seeded yet — it seeds automatically on app startup.")
-    else:
-        cols = st.columns(len(summary))
-        for col, row in zip(cols, summary):
-            col.metric(f"{row['resource_type']} available", row["available"],
-                       help=f"{row['assigned']} assigned, {row['total']} total in pool")
-        st.dataframe(summary, use_container_width=True)
-
-    st.divider()
-    st.subheader("Top up a resource pool")
-    resource_type_choice = st.selectbox(
-        "Resource type", list(resource_service.RESOURCE_GENERATORS.keys()),
-    )
-    add_count = st.number_input("How many to add", min_value=1, max_value=10000, value=100, step=50)
-    if st.button("➕ Add resources to pool", type="primary"):
-        result = resource_service.add_more_resources(resource_type_choice, int(add_count))
-        st.success(f"Added {result['added']} more {result['resource_type']} resources to the pool.")
-
-    st.divider()
-    st.subheader("All service instances currently using a resource")
-    all_instances = inventory_service.list_product_instances()
-    st.caption(f"{len(all_instances)} product instance(s) exist. Each active one holds one "
-               f"allocated resource (MSISDN/circuit ID/IMSI) from the pool above.")
+# TAB 7
