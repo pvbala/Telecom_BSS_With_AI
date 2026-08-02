@@ -32,6 +32,7 @@ def init_db():
     from modules.billing import models as _billing_models       # noqa
     from modules.assurance import models as _assurance_models   # noqa
     from modules.crm import models as _crm_models                # noqa
+    from modules.resource_inventory import models as _resource_models  # noqa
     from ai_ml import model_registry as _model_registry          # noqa
 
     Base.metadata.create_all(bind=engine)
