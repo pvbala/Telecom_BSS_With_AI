@@ -1,16 +1,23 @@
 """
 Central configuration for the Telecom BSS/OSS platform.
 
-API keys are NEVER hard-coded. They are taken as input from the user at
-runtime, in this order of precedence:
-  1. Already set in the OS environment (os.environ)
-  2. Present in a local .env file (loaded via python-dotenv)
-  3. Entered by the user through the Streamlit "Settings" page, which
-     writes them into .env for future runs.
+*** MULTI-USER KEY ISOLATION - READ THIS FIRST ***
+This app can be used by multiple people connecting to the same running
+instance at once. os.environ and the .env file below are PROCESS-WIDE:
+anything stored there is visible to and usable by every user of this
+deployment, not just the person who entered it.
 
-If none of the above are available when an LLM call is made, the LLM
-client will raise a clear error asking the user to enter a key via the
-Settings page, rather than silently failing.
+For that reason, get_api_key()/save_api_key() in this file represent an
+explicit, OPT-IN "server-wide default" key only - e.g. something a
+solo developer sets once for their own local single-user use, or an
+admin deliberately provisions as a shared fallback for a whole team.
+
+Each individual user's OWN personal key should instead be kept in that
+user's Streamlit session only (st.session_state, set on the Settings
+page - see dashboard/pages/0_Settings.py) and passed explicitly into
+llm.client.generate(gemini_key=..., grok_key=...) on every call. Nothing
+in this file, and nothing in llm/client.py, reads a personal key from
+shared process state - keys only flow in as explicit function arguments.
 """
 import os
 from pathlib import Path
@@ -41,7 +48,12 @@ GROK_MODEL = os.getenv("GROK_MODEL", "grok-4.5")
 
 
 def get_api_key(provider: str) -> str | None:
-    """Read an API key for a given provider ('gemini' or 'grok') from env."""
+    """
+    Reads the SERVER-WIDE DEFAULT key (process env / .env) for a provider.
+    This is a shared fallback only - see the module docstring. Personal,
+    per-user keys must NOT go through this function; pass them explicitly
+    into llm.client.generate() instead.
+    """
     key_name = {"gemini": "GEMINI_API_KEY", "grok": "GROK_API_KEY"}.get(provider)
     if not key_name:
         return None
@@ -50,9 +62,11 @@ def get_api_key(provider: str) -> str | None:
 
 def save_api_key(provider: str, value: str) -> None:
     """
-    Persist an API key entered by the user (e.g. via the Streamlit Settings
-    page) into the local .env file AND the current process environment,
-    so it's usable immediately without a restart.
+    Persists a SERVER-WIDE DEFAULT key into the local .env file AND the
+    current process environment. This key becomes usable by EVERY user
+    of this running app, not just whoever calls this function - only use
+    it for a genuinely shared/admin-provisioned key or solo local use,
+    never to store an individual user's personal key.
     """
     key_name = {"gemini": "GEMINI_API_KEY", "grok": "GROK_API_KEY"}.get(provider)
     if not key_name:
@@ -64,7 +78,7 @@ def save_api_key(provider: str, value: str) -> None:
 
 
 def configured_providers() -> dict:
-    """Return which providers currently have a usable key/endpoint configured."""
+    """Return which providers currently have a server-wide default key/endpoint configured."""
     return {
         "gemini": bool(get_api_key("gemini")),
         "grok": bool(get_api_key("grok")),
