@@ -81,7 +81,12 @@ def _describe_offerings() -> str:
     return "\n".join(lines)
 
 
-def translate(nl_text: str) -> dict:
+def translate(nl_text: str, gemini_key: str | None = None, grok_key: str | None = None) -> dict:
+    """
+    gemini_key / grok_key: the CALLING USER's own keys (from their
+    Streamlit session), passed through explicitly so this never falls
+    back to a key belonging to a different user of the same deployment.
+    """
     offerings_description = _describe_offerings()
 
     # NOTE: we deliberately use a plain string replace (not str.format) here,
@@ -94,7 +99,7 @@ def translate(nl_text: str) -> dict:
         f"{schema_guide}\n\n"
         f"User's request: \"{nl_text}\"\n\nYAML:"
     )
-    llm_result = generate(prompt)
+    llm_result = generate(prompt, gemini_key=gemini_key, grok_key=grok_key)
     raw_yaml = llm_result["text"].strip()
     # strip markdown fences if the model added them anyway
     raw_yaml = raw_yaml.strip("`")
