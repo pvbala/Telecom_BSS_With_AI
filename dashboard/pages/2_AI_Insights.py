@@ -10,6 +10,7 @@ from modules.party import service as party_service
 from modules.assurance import service as assurance_service
 from modules.billing import service as billing_service
 from modules.crm import service as crm_service
+from dashboard.session_keys import get_session_keys
 
 st.set_page_config(page_title="AI Insights", layout="wide")
 st.title("AI Predictions")
@@ -104,8 +105,9 @@ for kind, item in attention_items:
             if b2.button("Explain", key=f"btn_action_{key}", type="primary"):
                 try:
                     from llm.troubleshoot_narrator import narrate_anomaly
+                    gemini_key, grok_key = get_session_keys()
                     related = assurance_service.list_alarms(alarm_type=item["alarm_type"])
-                    narrative = narrate_anomaly(item, related)
+                    narrative = narrate_anomaly(item, related, gemini_key=gemini_key, grok_key=grok_key)
                     st.info(narrative)
                 except Exception as e:
                     st.error(f"Could not generate explanation: {e}")

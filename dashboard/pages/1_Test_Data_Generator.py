@@ -8,6 +8,7 @@ import yaml
 from test_data_engine.nl_spec_translator import translate
 from test_data_engine.spec_parser import parse_spec, summarize_plan, SpecValidationError
 from test_data_engine.orchestrator import run_scenario
+from dashboard.session_keys import get_session_keys
 
 st.title("🧪 Test Data Generator")
 st.caption("Data is always ADDED to what already exists — nothing is ever overwritten.")
@@ -18,6 +19,10 @@ if "draft_yaml" not in st.session_state:
     st.session_state.draft_yaml = ""
 
 if mode == "Plain English":
+    gemini_key, grok_key = get_session_keys()
+    if not gemini_key and not grok_key:
+        st.caption("No personal API key set for your session — falling back to any server "
+                   "default, then Ollama. Set your own key on the Settings page for best results.")
     nl_text = st.text_area(
         "Describe the business process test case",
         placeholder="Create 5 Customers, Put 2 Orders for each of these 5 customers, "
@@ -26,7 +31,7 @@ if mode == "Plain English":
     )
     if st.button("Translate to spec"):
         with st.spinner("Asking the LLM to draft a spec..."):
-            result = translate(nl_text)
+            result = translate(nl_text, gemini_key=gemini_key, grok_key=grok_key)
         if "error" in result:
             st.error(result["error"])
             st.code(result.get("raw_yaml", ""), language="yaml")

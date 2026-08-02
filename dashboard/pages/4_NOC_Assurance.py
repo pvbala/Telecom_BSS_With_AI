@@ -7,8 +7,11 @@ from modules.assurance.service import list_alarms, list_tickets, raise_alarm
 from ai_ml.serve import score_anomaly_detection
 from llm.troubleshoot_narrator import narrate_anomaly
 from llm.nl_query import ask as nl_ask
+from dashboard.session_keys import get_session_keys
 
-st.title("📶 NOC / Assurance")
+st.title("NOC / Assurance")
+
+gemini_key, grok_key = get_session_keys()
 
 col1, col2 = st.columns(2)
 with col1:
@@ -33,7 +36,10 @@ if st.button("Run anomaly detection now"):
     if anomalies:
         top = anomalies[0]
         with st.spinner("Asking LLM for a root-cause narrative..."):
-            narrative = narrate_anomaly(top, [r for r in results if r["alarm_type"] == top["alarm_type"]])
+            narrative = narrate_anomaly(
+                top, [r for r in results if r["alarm_type"] == top["alarm_type"]],
+                gemini_key=gemini_key, grok_key=grok_key,
+            )
         st.info(narrative)
 
 st.divider()
@@ -41,11 +47,13 @@ st.subheader("Trouble Tickets")
 st.dataframe(list_tickets(), use_container_width=True)
 
 st.divider()
-st.subheader("Ask a question about your data (natural language → SQL)")
+st.subheader("Ask a question about your data (natural language -> SQL)")
+if not gemini_key and not grok_key:
+    st.caption("No personal API key set for your session — set one on the Settings page for best results.")
 question = st.text_input("e.g. 'How many critical alarms were raised?'")
 if st.button("Ask") and question:
     with st.spinner("Thinking..."):
-        result = nl_ask(question)
+        result = nl_ask(question, gemini_key=gemini_key, grok_key=grok_key)
     st.code(result.get("sql", ""), language="sql")
     if "error" in result:
         st.error(result["error"])
