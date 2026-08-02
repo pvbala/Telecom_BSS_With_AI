@@ -32,6 +32,17 @@ def update_invoice_status(invoice_id: int, status: str) -> dict:
     return result
 
 
+def mark_invoice_paid(invoice_id: int) -> dict:
+    """
+    Invoice Payment feature (Manage Entities): the simple, no-partial-payment
+    version - just flips an invoice straight to PAID. This is the function
+    the 'Mark as Paid' button calls.
+    """
+    result = update_invoice_status(invoice_id, "PAID")
+    publish("invoice_paid", **result)
+    return result
+
+
 def list_invoices(account_id: int | None = None) -> list[dict]:
     with get_session() as session:
         q = session.query(Invoice)
