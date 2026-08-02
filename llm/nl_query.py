@@ -19,15 +19,16 @@ crm_retention_cases(id, code, customer_id, churn_score, reason, status)
 _UNSAFE_PATTERN = re.compile(r"\b(drop|delete|update|insert|alter|truncate)\b", re.IGNORECASE)
 
 
-def ask(question: str) -> dict:
-    """Natural-language question -> SQL (via LLM) -> executed against SQLite -> results."""
+def ask(question: str, gemini_key: str | None = None, grok_key: str | None = None) -> dict:
+    """Natural-language question -> SQL (via LLM) -> executed against SQLite -> results.
+    gemini_key / grok_key: the calling user's own keys, passed through explicitly."""
     prompt = f"""Given this SQLite schema:
 {SCHEMA_SUMMARY}
 
 Write ONE read-only SQLite SELECT query (no explanation, just the SQL)
 that answers this question: "{question}"
 """
-    sql_response = generate(prompt)["text"].strip()
+    sql_response = generate(prompt, gemini_key=gemini_key, grok_key=grok_key)["text"].strip()
     sql = sql_response.strip("`").replace("sql\n", "").strip()
 
     if _UNSAFE_PATTERN.search(sql) or not sql.lower().startswith("select"):

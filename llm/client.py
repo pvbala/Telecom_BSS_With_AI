@@ -1,17 +1,25 @@
 """
 Single call site for all LLM usage in the platform.
 
+MULTI-USER KEY ISOLATION:
+API keys are passed in EXPLICITLY per call (gemini_key / grok_key
+parameters) rather than read from a shared global/environment variable.
+This matters because this app can be used by multiple people at once:
+os.environ and a shared .env file are process-wide, so if one person's
+key were stored there, every other user of the same running app would
+silently be able to use it too. Each Streamlit session resolves its own
+key from st.session_state (see dashboard/pages/0_Settings.py) and passes
+it into these functions explicitly - nothing here reads a shared key by
+default. core.config.get_api_key() is used only as an OPT-IN server-wide
+fallback (see core/config.py) for single-user/local deployments.
+
 generate(prompt) tries providers in order: Gemini -> Grok -> Ollama.
 - Gemini and Grok are cloud APIs with token/rate limits - if either
   raises a rate-limit, quota, auth, timeout, or connection error, it
   falls through to the next provider.
 - Ollama is the guaranteed local last resort (no token limit, no cost,
-  fully offline) as discussed - it always runs if the two cloud
-  providers are unavailable or exhausted.
-
-API keys are taken as user input (never hard-coded) via core.config,
-which reads them from the environment/.env or the Streamlit Settings
-page (core.config.save_api_key).
+  fully offline, no key needed) - it always runs if the two cloud
+  providers are unavailable, exhausted, or no key was supplied for them.
 """
 import logging
 import requests
@@ -26,10 +34,10 @@ class ProviderError(Exception):
     pass
 
 
-def _call_gemini(prompt: str) -> str:
-    api_key = get_api_key("gemini")
+def _call_gemini(prompt: str, api_key: str | None = None) -> str:
+    api_key = api_key or get_api_key("gemini")
     if not api_key:
-        raise ProviderError("Gemini API key not configured. Add it in the Settings page.")
+        raise ProviderError("No Gemini API key available. Enter your own key in the Settings page.")
     import google.generativeai as genai
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel(GEMINI_MODEL)
@@ -39,10 +47,10 @@ def _call_gemini(prompt: str) -> str:
     return response.text
 
 
-def _call_grok(prompt: str) -> str:
-    api_key = get_api_key("grok")
+def _call_grok(prompt: str, api_key: str | None = None) -> str:
+    api_key = api_key or get_api_key("grok")
     if not api_key:
-        raise ProviderError("Grok API key not configured. Add it in the Settings page.")
+        raise ProviderError("No Grok API key available. Enter your own key in the Settings page.")
     # Grok (xAI) exposes an OpenAI-compatible chat completions endpoint
     resp = requests.post(
         "https://api.x.ai/v1/chat/completions",
@@ -64,7 +72,9 @@ def _call_grok(prompt: str) -> str:
     return data["choices"][0]["message"]["content"]
 
 
-def _call_ollama(prompt: str) -> str:
+def _call_ollama(prompt: str, api_key: str | None = None) -> str:
+    # Ollama is local and needs no key; api_key is accepted (and ignored)
+    # only so every caller in _CALLERS shares the same signature.
     try:
         resp = requests.post(
             f"{OLLAMA_HOST}/api/generate",
@@ -94,18 +104,26 @@ def _call_ollama(prompt: str) -> str:
 _CALLERS = {"gemini": _call_gemini, "grok": _call_grok, "ollama": _call_ollama}
 
 
-def generate(prompt: str, providers: list[str] | None = None) -> dict:
+def generate(prompt: str, providers: list[str] | None = None,
+             gemini_key: str | None = None, grok_key: str | None = None) -> dict:
     """
     Returns {"text": ..., "provider_used": ...}.
     Tries each provider in PROVIDER_ORDER (or a custom order) until one
     succeeds; raises RuntimeError only if all configured/available
     providers fail (Ollama should virtually always succeed if installed).
+
+    gemini_key / grok_key: pass the CALLING USER'S OWN key here (e.g.
+    from st.session_state in a Streamlit page). If omitted, falls back
+    to any server-wide default configured via core.config - which is
+    intentionally opt-in and shared, so leave these None-safe defaults
+    alone for multi-user deployments and always pass explicit keys.
     """
     order = providers or PROVIDER_ORDER
+    key_map = {"gemini": gemini_key, "grok": grok_key, "ollama": None}
     last_error = None
     for provider in order:
         try:
-            text = _CALLERS[provider](prompt)
+            text = _CALLERS[provider](prompt, key_map.get(provider))
             return {"text": text, "provider_used": provider}
         except Exception as e:
             log.warning("Provider '%s' failed: %s — falling back", provider, e)
